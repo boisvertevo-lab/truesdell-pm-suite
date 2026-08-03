@@ -8,13 +8,18 @@ class PDFEngine:
         self.excel = None
 
     def start(self):
+
         if self.excel is None:
+
             self.excel = win32com.client.DispatchEx("Excel.Application")
+
             self.excel.Visible = False
             self.excel.DisplayAlerts = False
 
     def stop(self):
+
         if self.excel:
+
             self.excel.Quit()
             self.excel = None
 
@@ -33,23 +38,12 @@ class PDFEngine:
 
         try:
 
-            print("=" * 60)
-            print("Workbook :", workbook_path)
-            print("Worksheet:", worksheet_name)
-            print("Output   :", output_folder)
-
-            print("Available Worksheets:")
-            for ws in workbook.Worksheets:
-                print("   ", ws.Name)
-
             worksheet = workbook.Worksheets(worksheet_name)
 
             output_pdf = os.path.join(
                 output_folder,
                 f"{worksheet_name} Cover Sheet.pdf"
             )
-
-            print("Saving As:", output_pdf)
 
             worksheet.ExportAsFixedFormat(
                 Type=0,
@@ -60,18 +54,16 @@ class PDFEngine:
                 OpenAfterPublish=False,
             )
 
-            print("SUCCESS!")
+            workbook.Close(False)
+
+            self.stop()
 
             return output_pdf
 
-        except Exception as e:
-
-            print("EXPORT FAILED")
-            print(type(e))
-            print(e)
-            raise
-
-        finally:
+        except Exception:
 
             workbook.Close(False)
+
             self.stop()
+
+            raise

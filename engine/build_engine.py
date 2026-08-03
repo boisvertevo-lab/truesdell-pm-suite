@@ -1,57 +1,21 @@
-def buildSelected(self):
+from engine.pdf_engine import PDFEngine
 
-    if self.table.currentRow() < 0:
 
-        QMessageBox.information(
-            self,
-            "Select Submittal",
-            "Please select a row."
-        )
-        return
+class BuildEngine:
 
-    if self.output_folder == "":
+    def __init__(self):
 
-        QMessageBox.information(
-            self,
-            "Output Folder",
-            "Please choose an output folder."
-        )
-        return
+        self.pdf = PDFEngine()
 
-    if self.pdf_library == "":
+    def build_selected(
+        self,
+        workbook_path,
+        worksheet_name,
+        output_folder,
+    ):
 
-        QMessageBox.information(
-            self,
-            "PDF Library",
-            "Please choose the PDF Library."
-        )
-        return
-
-    row = self.table.currentRow()
-
-    sheet = str(
-        self.table.item(row, 0).text()
-    ).zfill(2)
-
-    try:
-
-        pdf = self.pdf.build_submittal(
-            self.workbook_path,
-            sheet,
-            self.pdf_library,
-            self.output_folder
-        )
-
-        QMessageBox.information(
-            self,
-            "Complete",
-            f"Finished!\n\n{pdf}"
-        )
-
-    except Exception as ex:
-
-        QMessageBox.critical(
-            self,
-            "Build Error",
-            str(ex)
+        return self.pdf.export_cover_sheet(
+            workbook_path,
+            worksheet_name,
+            output_folder,
         )
