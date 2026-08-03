@@ -166,6 +166,7 @@ class MainWindow(QWidget):
             result = self.builder.build_selected(
                 self.workbook_path,
                 worksheet_name,
+                self.pdf_library,
                 self.output_folder,
             )
             QMessageBox.information(
@@ -214,6 +215,7 @@ class MainWindow(QWidget):
                 self.builder.build_selected(
                     self.workbook_path,
                     worksheet_name,
+                    self.pdf_library,
                     self.output_folder,
                 )
             except Exception as exc:
