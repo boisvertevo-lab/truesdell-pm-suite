@@ -11,7 +11,9 @@ class PDFEngine:
 
         if self.excel is None:
 
-            self.excel = win32com.client.DispatchEx("Excel.Application")
+            self.excel = win32com.client.DispatchEx(
+                "Excel.Application"
+            )
 
             self.excel.Visible = False
             self.excel.DisplayAlerts = False
@@ -47,23 +49,12 @@ class PDFEngine:
 
             worksheet.ExportAsFixedFormat(
                 Type=0,
-                Filename=os.path.abspath(output_pdf),
-                Quality=0,
-                IncludeDocProperties=True,
-                IgnorePrintAreas=False,
-                OpenAfterPublish=False,
+                Filename=os.path.abspath(output_pdf)
             )
-
-            workbook.Close(False)
-
-            self.stop()
 
             return output_pdf
 
-        except Exception:
+        finally:
 
             workbook.Close(False)
-
             self.stop()
-
-            raise
