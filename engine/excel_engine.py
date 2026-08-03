@@ -1,156 +1,76 @@
-import os
-from pypdf import PdfReader, PdfWriter
-import win32com.client
+from openpyxl import load_workbook
 
 
-class PDFEngine:
+class ExcelEngine:
 
-    def __init__(self):
-        self.excel = None
+    def __init__(self, filename):
 
-    ############################################################
+        self.filename = filename
 
-    def start_excel(self):
-
-        if self.excel is None:
-            self.excel = win32com.client.DispatchEx("Excel.Application")
-            self.excel.Visible = False
-            self.excel.DisplayAlerts = False
-
-    ############################################################
-
-    def stop_excel(self):
-
-        if self.excel:
-            self.excel.Quit()
-            self.excel = None
-
-    ############################################################
-
-    def export_cover_sheet(
-        self,
-        workbook_path,
-        worksheet_name,
-        output_folder,
-    ):
-
-        self.start_excel()
-
-        workbook = self.excel.Workbooks.Open(
-            os.path.abspath(workbook_path)
+        self.workbook = load_workbook(
+            filename,
+            data_only=True
         )
 
-        try:
+        self.log = self.workbook["Log"]
 
-            sheet = workbook.Worksheets(worksheet_name)
+    @property
+    def project_name(self):
 
-            output_pdf = os.path.join(
-                output_folder,
-                f"{worksheet_name} Cover Sheet.pdf"
-            )
+        return self.log["B3"].value or ""
 
-            sheet.ExportAsFixedFormat(
-                Type=0,
-                Filename=os.path.abspath(output_pdf),
-                Quality=0,
-                IncludeDocProperties=True,
-                IgnorePrintAreas=False,
-                OpenAfterPublish=False,
-            )
+    @property
+    def description(self):
 
-            workbook.Close(False)
+        return self.log["B4"].value or ""
 
-            return output_pdf
+    @property
+    def job_number(self):
 
-        finally:
+        return self.log["B5"].value or ""
 
-            self.stop_excel()
+    def get_submittals(self):
 
-    ############################################################
+        rows = []
 
-    def find_attachment(
-        self,
-        pdf_library,
-        submittal_number,
-    ):
+        row = 15
+        blank = 0
 
-        search = f"Submittal #{int(submittal_number)}"
+        while True:
 
-        for root, _, files in os.walk(pdf_library):
+            number = self.log[f"A{row}"].value
+            description = self.log[f"B{row}"].value
 
-            for file in files:
+            if number is None and description is None:
 
-                if not file.lower().endswith(".pdf"):
-                    continue
+                blank += 1
 
-                if file.startswith(search):
+                if blank >= 5:
+                    break
 
-                    return os.path.join(root, file)
+                row += 1
+                continue
 
-        return None
+            blank = 0
 
-    ############################################################
+            rows.append({
 
-    def merge_pdfs(
-        self,
-        cover_pdf,
-        attachment_pdf,
-        output_pdf,
-    ):
+                "number": number,
 
-        writer = PdfWriter()
+                "description": description or "",
 
-        cover = PdfReader(cover_pdf)
+                "supplier": self.log[f"C{row}"].value or "",
 
-        for page in cover.pages:
-            writer.add_page(page)
+                "spec": self.log[f"D{row}"].value or "",
 
-        attach = PdfReader(attachment_pdf)
+                "submitted": self.log[f"E{row}"].value,
 
-        for page in attach.pages:
-            writer.add_page(page)
+                "returned": self.log[f"F{row}"].value,
 
-        with open(output_pdf, "wb") as f:
-            writer.write(f)
+                "approved": self.log[f"G{row}"].value or ""
 
-        return output_pdf
+            })
 
-    ############################################################
+            row += 1
 
-    def build_submittal(
-        self,
-        workbook_path,
-        worksheet_name,
-        pdf_library,
-        output_folder,
-    ):
-
-        cover = self.export_cover_sheet(
-            workbook_path,
-            worksheet_name,
-            output_folder,
-        )
-
-        attachment = self.find_attachment(
-            pdf_library,
-            worksheet_name,
-        )
-
-        if attachment is None:
-
-            raise Exception(
-                f"Could not locate PDF for Submittal #{int(worksheet_name)}"
-            )
-
-        final_pdf = os.path.join(
-            output_folder,
-            os.path.basename(attachment),
-        )
-
-        self.merge_pdfs(
-            cover,
-            attachment,
-            final_pdf,
-        )
-
-        return final_pdf
+        return rows
