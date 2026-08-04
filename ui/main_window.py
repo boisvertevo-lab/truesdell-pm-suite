@@ -1,3 +1,4 @@
+from settings.settings_manager import SettingsManager
 from PySide6.QtWidgets import (
     QApplication,
     QFileDialog,
@@ -9,6 +10,7 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMessageBox,
     QPushButton,
+    QProgressBar,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
@@ -32,6 +34,11 @@ class MainWindow(QWidget):
 
         self.excel = None
         self.builder = BuildEngine()
+        self.settings = SettingsManager()
+
+        self.workbook_path = self.settings.get("workbook")
+        self.pdf_library = self.settings.get("pdf_library")
+        self.output_folder = self.settings.get("output_folder")
 
         self.project_value = QLabel("")
         self.job_value = QLabel("")
@@ -42,6 +49,12 @@ class MainWindow(QWidget):
         self.output_folder_btn = QPushButton("Output Folder")
         self.build_selected_btn = QPushButton("Build Selected")
         self.build_all_btn = QPushButton("Build All")
+        self.progress_label = QLabel("")
+        self.progress_bar = QProgressBar()
+
+        self.progress_bar.setMinimum(0)
+        self.progress_bar.setValue(0)
+        self.progress_bar.hide()
 
         self.table = QTableWidget(0, 5)
         self.table.setHorizontalHeaderLabels(
@@ -77,6 +90,8 @@ class MainWindow(QWidget):
         layout.addWidget(project_info_group)
         layout.addLayout(button_row)
         layout.addWidget(self.table)
+        layout.addWidget(self.progress_label)
+        layout.addWidget(self.progress_bar)
 
     def open_workbook(self):
         workbook_path, _ = QFileDialog.getOpenFileName(
@@ -92,6 +107,10 @@ class MainWindow(QWidget):
         try:
             self.excel = ExcelEngine(workbook_path)
             self.workbook_path = workbook_path
+            self.settings.set(
+            "workbook",
+                workbook_path,
+            )
 
             self.project_value.setText(self.excel.project_name)
             self.job_value.setText(self.excel.job_number)
@@ -109,6 +128,12 @@ class MainWindow(QWidget):
         submittals = self.excel.get_submittals()
         self.table.setRowCount(len(submittals))
 
+        submittals = self.excel.get_submittals()
+
+        print("Returned submittals:")
+        for s in submittals:
+            print(s)
+
         for row_index, submittal in enumerate(submittals):
             self.table.setItem(row_index, 0, QTableWidgetItem(str(submittal.get("number", ""))))
             self.table.setItem(row_index, 1, QTableWidgetItem(str(submittal.get("description", ""))))
@@ -123,7 +148,12 @@ class MainWindow(QWidget):
         )
 
         if folder:
-            self.pdf_library = folder
+          self.pdf_library = folder
+
+        self.settings.set(
+        "pdf_library",
+            folder,
+    )  
 
     def choose_output_folder(self):
         folder = QFileDialog.getExistingDirectory(
@@ -133,6 +163,11 @@ class MainWindow(QWidget):
 
         if folder:
             self.output_folder = folder
+
+            self.settings.set(
+                "output_folder",
+                folder,
+        )
 
     def build_selected(self):
         if self.excel is None or not self.workbook_path:
@@ -182,7 +217,8 @@ class MainWindow(QWidget):
             )
 
     def build_all(self):
-        if self.excel is None or not self.workbook_path:
+
+        if self.excel is None:
             QMessageBox.information(
                 self,
                 "Workbook Required",
@@ -198,38 +234,89 @@ class MainWindow(QWidget):
             )
             return
 
-        if self.table.rowCount() == 0:
-            QMessageBox.information(
-                self,
-                "No Submittals",
-                "There are no submittals to build.",
-            )
-            return
+        total = self.table.rowCount()
+
+        self.progress_bar.setMaximum(total)
+        self.progress_bar.setValue(0)
+        self.progress_bar.show()
 
         errors = []
 
-        for row in range(self.table.rowCount()):
-            worksheet_name = self.table.item(row, 0).text().strip().zfill(2)
+        for row in range(total):
+
+            item = self.table.item(row, 0)
+
+            if item is None:
+                continue
+
+            worksheet_name = item.text().strip()
+
+            if worksheet_name == "":
+                continue
+
+            if not worksheet_name.isdigit():
+                continue
+
+            worksheet_name = worksheet_name.zfill(2)
+
+            self.progress_label.setText(
+                f"Building {worksheet_name} ({row + 1}/{total})..."
+            )
+
+            QApplication.processEvents()
 
             try:
+
                 self.builder.build_selected(
                     self.workbook_path,
                     worksheet_name,
                     self.pdf_library,
                     self.output_folder,
                 )
+
             except Exception as exc:
-                errors.append(f"{worksheet_name}: {exc}")
+
+                errors.append(
+                    f"{worksheet_name}: {exc}"
+                )
+
+            self.progress_bar.setValue(row + 1)
+
+            QApplication.processEvents()
+
+            try:
+
+                self.builder.build_selected(
+                    self.workbook_path,
+                    worksheet_name,
+                    self.pdf_library,
+                    self.output_folder,
+                )
+
+            except Exception as exc:
+
+                errors.append(
+                    f"{worksheet_name}: {exc}"
+                )
+
+            self.progress_bar.setValue(row + 1)
+
+            QApplication.processEvents()
+
+        self.progress_label.setText("Finished")
 
         if errors:
-            QMessageBox.critical(
+
+            QMessageBox.warning(
                 self,
-                "Build Error",
+                "Completed with Errors",
                 "\n".join(errors),
             )
+
         else:
+
             QMessageBox.information(
                 self,
-                "Complete",
-                "All submittals were built successfully.",
-            )
+                "Finished",
+                f"Successfully built {total} submittals."
+            )  
